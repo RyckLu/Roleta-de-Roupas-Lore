@@ -1,68 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Wheel } from 'react-custom-roulette';
 import './App.css';
 
 
 const STREAM_ELEMENTS_JWT = import.meta.env.VITE_SE_TOKEN;
 
-  useEffect(() => {
-    
-    const ws = new WebSocket('wss://astro.streamelements.com');
-
-    
-    ws.onopen = () => {
-      console.log('Conectado ao StreamElements Astro!');
-      
-      const authMessage = {
-        type: 'subscribe',
-        nonce: 'roleta-obs-123', 
-        topic: 'channel.activities', 
-        token: STREAM_ELEMENTS_JWT,
-        token_type: 'jwt'
-      };
-      
-      ws.send(JSON.stringify(authMessage));
-    };
-
-    
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        
-       
-        const activity = message.data || message;
-
-       
-        if (activity.type === 'tip') {
-       
-          const amount = activity.amount || (activity.detail && activity.detail.amount);
-          
-          
-          if (amount === 20) {
-            console.log('Doação de R$ 20 recebida! Girando a roleta...');
-            triggerSpin();
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao ler a mensagem do WebSocket:', error);
-      }
-    };
-
-    
-    ws.onclose = () => console.log('Desconectado do StreamElements.');
-    ws.onerror = (error) => console.error('Erro no WebSocket:', error);
-
-   
-    return () => {
-      ws.close();
-    };
-  }, []);
-
 function App() {
   const [mustSpin, setMustSpin] = useState(false);
   const [prizeNumber, setPrizeNumber] = useState(0);
   const [result, setResult] = useState('');
 
+  
   const [rouletteData, setRouletteData] = useState([
     { option: 'Prime' },
     { option: 'Brazil' },
@@ -76,21 +24,76 @@ function App() {
     { option: 'Freira' },
     { option: 'Natal' },
     { option: 'Cavalheira' },
-    { option: 'Kitsune' },
-    
+    { option: 'Kitsune' }
   ]);
 
   const [newOption, setNewOption] = useState('');
 
+  
+  const triggerSpin = () => {
+    setRouletteData((currentData) => {
+      if (currentData.length > 0) {
+        const newPrizeNumber = Math.floor(Math.random() * currentData.length);
+        setPrizeNumber(newPrizeNumber);
+        setMustSpin(true);
+        setResult('');
+      }
+      return currentData;
+    });
+  };
+
+  
   const handleSpinClick = () => {
     if (!mustSpin && rouletteData.length > 0) {
-      const newPrizeNumber = Math.floor(Math.random() * rouletteData.length);
-      setPrizeNumber(newPrizeNumber);
-      setMustSpin(true);
-      setResult('');
+      triggerSpin();
     }
   };
 
+  
+  useEffect(() => {
+    const ws = new WebSocket('wss://astro.streamelements.com');
+
+    ws.onopen = () => {
+      console.log('Conectado ao StreamElements Astro!');
+      
+      const authMessage = {
+        type: 'subscribe',
+        nonce: 'roleta-obs-123',
+        topic: 'channel.activities',
+        token: STREAM_ELEMENTS_JWT,
+        token_type: 'jwt'
+      };
+      
+      ws.send(JSON.stringify(authMessage));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        const activity = message.data || message;
+
+        if (activity.type === 'tip') {
+          const amount = activity.amount || (activity.detail && activity.detail.amount);
+          
+          if (amount === 20) {
+            console.log('Doação de R$ 20 recebida! Girando a roleta...');
+            triggerSpin();
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao ler a mensagem do WebSocket:', error);
+      }
+    };
+
+    ws.onclose = () => console.log('Desconectado do StreamElements.');
+    ws.onerror = (error) => console.error('Erro no WebSocket:', error);
+
+    return () => {
+      ws.close();
+    };
+  }, []); 
+
+  
   const handleAddOption = (e) => {
     e.preventDefault();
     if (newOption.trim() !== '') {
@@ -112,7 +115,7 @@ function App() {
     <div className="app-wrapper">
       <div className="container">
         
-        {/* Lado Esquerdo: A Roleta */}
+        
         <div className="card roulette-section">
           <h1>Roleta de Roupas</h1>
           
@@ -147,7 +150,7 @@ function App() {
           {result && <h2 className="result-text">Resultado: {result}!</h2>}
         </div>
 
-        {/* Lado Direito: Controles */}
+        
         <div className="card controls-section">
           <h2>Personalizar Opções</h2>
           
