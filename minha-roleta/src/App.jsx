@@ -75,8 +75,8 @@ function App() {
         if (activity.type === 'tip') {
           const amount = activity.amount || (activity.detail && activity.detail.amount);
           
-          if (amount === 20) {
-            console.log('Doação de R$ 20 recebida! Girando a roleta...');
+          if (amount === 4.99) {
+            console.log('Doação de R$ 4.99 recebida! Girando a roleta...');
             triggerSpin();
           }
         }
