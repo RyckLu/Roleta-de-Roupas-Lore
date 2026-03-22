@@ -84,8 +84,8 @@ function App() {
           const amount = activity.amount || (activity.detail && activity.detail.amount);
           
           
-          if (amount === 20) {
-            console.log('Doação de R$ 20 recebida! Girando a roleta...');
+          if (amount === 10) {
+            console.log('Doação de R$ 10 recebida! Girando a roleta...');
             triggerSpin();
           }
         }
