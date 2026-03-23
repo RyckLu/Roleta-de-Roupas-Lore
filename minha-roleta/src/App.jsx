@@ -44,12 +44,12 @@ function App() {
     }
   };
 
-  // Conexão limpa e direta com o StreamElements
+  
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenDaUrl = urlParams.get('token');
 
-    if (!tokenDaUrl) return; // Se não tiver token, ignora a conexão silenciosamente
+    if (!tokenDaUrl) return;
 
     const socket = io('https://realtime.streamelements.com', {
       transports: ['websocket']
