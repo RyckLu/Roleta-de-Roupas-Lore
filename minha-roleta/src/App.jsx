@@ -7,6 +7,9 @@ function App() {
   const [mustSpin, setMustSpin] = useState(false);
   const [prizeNumber, setPrizeNumber] = useState(0);
   const [result, setResult] = useState('');
+  
+  
+  const [isVisible, setIsVisible] = useState(false); 
 
   const [rouletteData, setRouletteData] = useState([
     { option: 'Prime' },
@@ -33,6 +36,7 @@ function App() {
         setPrizeNumber(newPrizeNumber);
         setMustSpin(true);
         setResult(''); 
+        setIsVisible(true); 
       }
       return currentData;
     });
@@ -44,12 +48,11 @@ function App() {
     }
   };
 
-  
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenDaUrl = urlParams.get('token');
 
-    if (!tokenDaUrl) return;
+    if (!tokenDaUrl) return; 
 
     const socket = io('https://realtime.streamelements.com', {
       transports: ['websocket']
@@ -65,7 +68,6 @@ function App() {
                     || (eventData.data && eventData.data.amount) 
                     || (eventData.detail && eventData.detail.amount);
 
-        // Dispara a roleta se o valor for 20 ou maior
         if (Number(amount) >= 20) {
           triggerSpin();
         }
@@ -100,12 +102,20 @@ function App() {
     <div className="app-wrapper">
       <div className="container">
         
+        
         <div 
           className="card roulette-section" 
           style={{ 
             backgroundColor: isObsMode ? 'transparent' : '#1e1e1e', 
             border: isObsMode ? 'none' : '1px solid #333', 
-            boxShadow: isObsMode ? 'none' : '' 
+            boxShadow: isObsMode ? 'none' : '',
+            
+            
+            opacity: (isObsMode && !isVisible) ? 0 : 1,
+            
+            visibility: (isObsMode && !isVisible) ? 'hidden' : 'visible',
+            
+            transition: 'opacity 0.5s ease-in-out, visibility 0.5s ease-in-out'
           }}
         >
           <h1 style={{ display: isObsMode ? 'none' : 'block' }}>Roleta de Roupas</h1>
@@ -126,6 +136,11 @@ function App() {
               onStopSpinning={() => {
                 setMustSpin(false);
                 setResult(rouletteData[prizeNumber].option);
+
+               
+                setTimeout(() => {
+                  setIsVisible(false);
+                }, 5000);
               }}
             />
           </div>
