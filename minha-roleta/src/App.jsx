@@ -50,32 +50,41 @@ function App() {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const tokenDaUrl = urlParams.get('token');
+    const tokensParam = urlParams.get('token');
+    
+    if (!tokensParam) return; 
 
-    if (!tokenDaUrl) return; 
+    const tokensList = tokensParam.split(',').map(token => token.trim());
+    const activeSockets = [];
 
-    const socket = io('https://realtime.streamelements.com', {
-      transports: ['websocket']
-    });
+    tokensList.forEach((tokenDaUrl, index) => {
+      const socket = io('https://realtime.streamelements.com', {
+        transports: ['websocket']
+      });
 
-    socket.on('connect', () => {
-      socket.emit('authenticate', { method: 'jwt', token: tokenDaUrl });
-    });
+      socket.on('connect', () => {
+        console.log(` Conexão estabelecida para o Token ${index + 1}!`);
+        socket.emit('authenticate', { method: 'jwt', token: tokenDaUrl });
+      });
 
-    socket.on('event', (eventData) => {
-      if (eventData.type === 'tip') {
-        const amount = eventData.amount 
-                    || (eventData.data && eventData.data.amount) 
-                    || (eventData.detail && eventData.detail.amount);
+      socket.on('event', (eventData) => {
+        if (eventData.type === 'tip') {
+          const amount = eventData.amount 
+                      || (eventData.data && eventData.data.amount) 
+                      || (eventData.detail && eventData.detail.amount);
 
-        if (Number(amount) >= 20) {
-          triggerSpin();
+          if (Number(amount) >= VALOR_MINIMO_GIRO) {
+            console.log(`Doação detectada pelo Token ${index + 1}!`);
+            triggerSpin();
+          }
         }
-      }
+      });
+
+      activeSockets.push(socket);
     });
 
     return () => {
-      socket.disconnect();
+      activeSockets.forEach(socket => socket.disconnect());
     };
   }, []); 
 
