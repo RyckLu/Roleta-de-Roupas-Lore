@@ -4,26 +4,20 @@ import io from 'socket.io-client';
 import './App.css';
 
 function App() {
+  
+  const TEMPO_EXIBICAO = 8000; 
+  const VALOR_MINIMO_GIRO = 20; 
+
   const [mustSpin, setMustSpin] = useState(false);
   const [prizeNumber, setPrizeNumber] = useState(0);
   const [result, setResult] = useState('');
-  
-  
   const [isVisible, setIsVisible] = useState(false); 
 
   const [rouletteData, setRouletteData] = useState([
-    { option: 'Prime' },
-    { option: 'Brazil' },
-    { option: 'Street' },
-    { option: 'Casual' },
-    { option: 'Sweater' },
-    { option: 'Bikini' },
-    { option: 'Ghost' },
-    { option: 'Palhaxota' },
-    { option: 'Purplerina' },
-    { option: 'Freira' },
-    { option: 'Natal' },
-    { option: 'Cavalheira' },
+    { option: 'Prime' }, { option: 'Brazil' }, { option: 'Street' },
+    { option: 'Casual' }, { option: 'Sweater' }, { option: 'Bikini' },
+    { option: 'Ghost' }, { option: 'Palhaxota' }, { option: 'Purplerina' },
+    { option: 'Freira' }, { option: 'Natal' }, { option: 'Cavalheira' },
     { option: 'Kitsune' }
   ]);
 
@@ -48,22 +42,27 @@ function App() {
     }
   };
 
+  
+  // 🟢 CONEXÃO MULTI-TOKENS (Lê 1, 2, 3 ou quantos tokens tiver)
+  
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokensParam = urlParams.get('token');
     
     if (!tokensParam) return; 
 
+    // Pega a string da URL, corta onde tem vírgula e cria uma lista de tokens
     const tokensList = tokensParam.split(',').map(token => token.trim());
-    const activeSockets = [];
+    const activeSockets = []; // Guarda todas as conexões para fechar depois
 
+    // Para cada token na lista, ele cria uma conexão independente
     tokensList.forEach((tokenDaUrl, index) => {
       const socket = io('https://realtime.streamelements.com', {
         transports: ['websocket']
       });
 
       socket.on('connect', () => {
-        console.log(` Conexão estabelecida para o Token ${index + 1}!`);
+        console.log(`🟢 Conexão estabelecida para o Token ${index + 1}!`);
         socket.emit('authenticate', { method: 'jwt', token: tokenDaUrl });
       });
 
@@ -74,7 +73,7 @@ function App() {
                       || (eventData.detail && eventData.detail.amount);
 
           if (Number(amount) >= VALOR_MINIMO_GIRO) {
-            console.log(`Doação detectada pelo Token ${index + 1}!`);
+            console.log(`🎉 Doação detectada pelo Token ${index + 1}!`);
             triggerSpin();
           }
         }
@@ -83,10 +82,12 @@ function App() {
       activeSockets.push(socket);
     });
 
+    // Quando fechar o site, ele desconecta todos os Sockets
     return () => {
       activeSockets.forEach(socket => socket.disconnect());
     };
   }, []); 
+  // -------------------------------------------------------------
 
   const handleAddOption = (e) => {
     e.preventDefault();
@@ -97,10 +98,7 @@ function App() {
   };
 
   const handleRemoveOption = (indexToRemove) => {
-    if (rouletteData.length <= 1) {
-      alert("A roleta precisa de pelo menos uma opção!");
-      return;
-    }
+    if (rouletteData.length <= 1) return;
     const newData = rouletteData.filter((_, index) => index !== indexToRemove);
     setRouletteData(newData);
   };
@@ -110,20 +108,14 @@ function App() {
   return (
     <div className="app-wrapper">
       <div className="container">
-        
-        
         <div 
           className="card roulette-section" 
           style={{ 
             backgroundColor: isObsMode ? 'transparent' : '#1e1e1e', 
             border: isObsMode ? 'none' : '1px solid #333', 
             boxShadow: isObsMode ? 'none' : '',
-            
-            
             opacity: (isObsMode && !isVisible) ? 0 : 1,
-            
             visibility: (isObsMode && !isVisible) ? 'hidden' : 'visible',
-            
             transition: 'opacity 0.5s ease-in-out, visibility 0.5s ease-in-out'
           }}
         >
@@ -146,10 +138,9 @@ function App() {
                 setMustSpin(false);
                 setResult(rouletteData[prizeNumber].option);
 
-               
                 setTimeout(() => {
                   setIsVisible(false);
-                }, 5000);
+                }, TEMPO_EXIBICAO);
               }}
             />
           </div>
@@ -169,7 +160,6 @@ function App() {
         {!isObsMode && (
           <div className="card controls-section">
             <h2>Personalizar Opções</h2>
-            
             <form onSubmit={handleAddOption} className="add-form">
               <input
                 type="text"
@@ -188,7 +178,6 @@ function App() {
                     className="remove-button"
                     onClick={() => handleRemoveOption(index)}
                     disabled={mustSpin}
-                    title="Remover opção"
                   >
                     ✕
                   </button>
