@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Wheel } from 'react-custom-roulette';
+import { Textfit } from 'react-textfit'; 
 import io from 'socket.io-client';
 import './App.css';
 
@@ -18,7 +19,7 @@ function App() {
     { option: 'Casual' }, { option: 'Sweater' }, { option: 'Bikini' },
     { option: 'Ghost' }, { option: 'Palhaxota' }, { option: 'Purplerina' },
     { option: 'Freira' }, { option: 'Natal' }, { option: 'Cavalheira' },
-    { option: 'Kitsune' }
+    { option: 'Kitsune' }, {option: 'Bunny' }, {option: 'schola'}
   ]);
 
   const [newOption, setNewOption] = useState('');
@@ -42,27 +43,21 @@ function App() {
     }
   };
 
-  
-  // 🟢 CONEXÃO MULTI-TOKENS (Lê 1, 2, 3 ou quantos tokens tiver)
-  
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokensParam = urlParams.get('token');
     
     if (!tokensParam) return; 
 
-    // Pega a string da URL, corta onde tem vírgula e cria uma lista de tokens
     const tokensList = tokensParam.split(',').map(token => token.trim());
-    const activeSockets = []; // Guarda todas as conexões para fechar depois
+    const activeSockets = []; 
 
-    // Para cada token na lista, ele cria uma conexão independente
     tokensList.forEach((tokenDaUrl, index) => {
       const socket = io('https://realtime.streamelements.com', {
         transports: ['websocket']
       });
 
       socket.on('connect', () => {
-        console.log(`🟢 Conexão estabelecida para o Token ${index + 1}!`);
         socket.emit('authenticate', { method: 'jwt', token: tokenDaUrl });
       });
 
@@ -73,7 +68,6 @@ function App() {
                       || (eventData.detail && eventData.detail.amount);
 
           if (Number(amount) >= VALOR_MINIMO_GIRO) {
-            console.log(`🎉 Doação detectada pelo Token ${index + 1}!`);
             triggerSpin();
           }
         }
@@ -82,12 +76,10 @@ function App() {
       activeSockets.push(socket);
     });
 
-    // Quando fechar o site, ele desconecta todos os Sockets
     return () => {
       activeSockets.forEach(socket => socket.disconnect());
     };
   }, []); 
-  // -------------------------------------------------------------
 
   const handleAddOption = (e) => {
     e.preventDefault();
@@ -143,6 +135,17 @@ function App() {
                 }, TEMPO_EXIBICAO);
               }}
             />
+            
+            
+            {result && (
+              <Textfit 
+                className="result-text-container" 
+                mode="single" 
+                max={72} 
+              >
+                <div className="result-text-inner">{result}</div>
+              </Textfit>
+            )}
           </div>
 
           <button 
@@ -153,8 +156,6 @@ function App() {
           >
             {mustSpin ? 'Girando...' : 'GIRAR!'}
           </button>
-
-          {result && <h2 className="result-text">Resultado: {result}!</h2>}
         </div>
 
         {!isObsMode && (
