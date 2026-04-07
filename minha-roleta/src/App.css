@@ -93,10 +93,29 @@ body {
 }
 
 .result-text {
-  margin-top: 15px;
+  
+  position: fixed; 
+  top: 40%; 
+  left: 30%; 
+  transform: translate(-50%, -50%); 
+  
+  z-index: 999; 
+  pointer-events: none; 
+
+  margin: 0;
+  width: max-content; 
+  
   color: #ff4a3d;
-  font-size: 1.2rem;
+  font-size: 4rem; 
   text-align: center;
+  
+  
+  text-shadow: 
+    -2px -2px 0 #000,  
+     2px -2px 0 #000,
+    -2px  2px 0 #000,
+     2px  2px 0 #000,
+     5px  5px 0 #000;
   animation: popIn 0.3s ease-out forwards;
 }
 
