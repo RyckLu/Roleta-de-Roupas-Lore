@@ -6,7 +6,7 @@ import './App.css';
 function App() {
   
   const TEMPO_EXIBICAO = 8000; 
-  const VALOR_MINIMO_GIRO = 20; 
+  const VALOR_MINIMO_GIRO = 1; 
 
   const [mustSpin, setMustSpin] = useState(false);
   const [prizeNumber, setPrizeNumber] = useState(0);
