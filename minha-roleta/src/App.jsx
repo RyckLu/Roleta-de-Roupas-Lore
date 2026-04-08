@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Wheel } from 'react-custom-roulette';
-import { Textfit } from 'react-textfit'; 
 import io from 'socket.io-client';
 import './App.css';
 
 function App() {
-  
   const TEMPO_EXIBICAO = 8000; 
   const VALOR_MINIMO_GIRO = 20; 
 
@@ -14,12 +12,20 @@ function App() {
   const [result, setResult] = useState('');
   const [isVisible, setIsVisible] = useState(false); 
 
+ 
+  const [spinQueue, setSpinQueue] = useState(0);
+  // Memória para não contar o mesmo donate duas vezes
+  const eventosProcessados = useRef(new Set());
+
+  const resultRef = useRef(null);
+  const [textScale, setTextScale] = useState(1);
+
   const [rouletteData, setRouletteData] = useState([
     { option: 'Prime' }, { option: 'Brazil' }, { option: 'Street' },
     { option: 'Casual' }, { option: 'Sweater' }, { option: 'Bikini' },
     { option: 'Ghost' }, { option: 'Palhaxota' }, { option: 'Purplerina' },
     { option: 'Freira' }, { option: 'Natal' }, { option: 'Cavalheira' },
-    { option: 'Kitsune' }, {option: 'Bunny' }, {option: 'schola'}
+    { option: 'Kitsune' }, { option: 'Bunny' }, { option: 'Schola' }
   ]);
 
   const [newOption, setNewOption] = useState('');
@@ -37,13 +43,25 @@ function App() {
     });
   };
 
+  
+  // Gerenciador da Fila
+  useEffect(() => {
+    // Se tem alguém na fila de espera E a roleta está livre (escondida)
+    if (spinQueue > 0 && !isVisible) {
+      setSpinQueue(prevQueue => prevQueue - 1); // Tira 1 da fila
+      triggerSpin(); // Manda girar!
+    }
+  }, [spinQueue, isVisible]); 
+  
   const handleSpinClick = () => {
-    if (!mustSpin && rouletteData.length > 0) {
-      triggerSpin();
+    if (rouletteData.length > 0) {
+      // O botão manual agora também entra na fila educadamente!
+      setSpinQueue(prevQueue => prevQueue + 1);
     }
   };
 
-  useEffect(() => {
+  // Mágica de medir o texto nativo
+ useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokensParam = urlParams.get('token');
     
@@ -52,7 +70,7 @@ function App() {
     const tokensList = tokensParam.split(',').map(token => token.trim());
     const activeSockets = []; 
 
-    tokensList.forEach((tokenDaUrl, index) => {
+    tokensList.forEach((tokenDaUrl) => {
       const socket = io('https://realtime.streamelements.com', {
         transports: ['websocket']
       });
@@ -62,13 +80,27 @@ function App() {
       });
 
       socket.on('event', (eventData) => {
+        // 🛡️ O FILTRO ANTI-CLONE AQUI!
+        // Pega a identidade única desse evento
+        const idDoEvento = eventData._id; 
+
+        // Se esse donate já passou por aqui, ignora e cancela!
+        if (idDoEvento && eventosProcessados.current.has(idDoEvento)) {
+          return; 
+        }
+
+        // Anota na prancheta que já recebemos esse ID
+        if (idDoEvento) {
+          eventosProcessados.current.add(idDoEvento);
+        }
+
         if (eventData.type === 'tip') {
           const amount = eventData.amount 
                       || (eventData.data && eventData.data.amount) 
                       || (eventData.detail && eventData.detail.amount);
 
           if (Number(amount) >= VALOR_MINIMO_GIRO) {
-            triggerSpin();
+            setSpinQueue(prevQueue => prevQueue + 1);
           }
         }
       });
@@ -79,7 +111,7 @@ function App() {
     return () => {
       activeSockets.forEach(socket => socket.disconnect());
     };
-  }, []); 
+  }, []);
 
   const handleAddOption = (e) => {
     e.preventDefault();
@@ -113,7 +145,9 @@ function App() {
         >
           <h1 style={{ display: isObsMode ? 'none' : 'block' }}>Roleta de Roupas</h1>
           
+         
           <div className="wheel-container">
+
             <Wheel
               mustStartSpinning={mustSpin}
               prizeNumber={prizeNumber}
@@ -131,30 +165,35 @@ function App() {
                 setResult(rouletteData[prizeNumber].option);
 
                 setTimeout(() => {
-                  setIsVisible(false);
+                  setIsVisible(false); // Quando some, o Guarda de Trânsito puxa o próximo!
                 }, TEMPO_EXIBICAO);
               }}
             />
             
-            
             {result && (
-              <Textfit 
-                className="result-text-container" 
-                mode="single" 
-                max={72} 
-              >
-                <div className="result-text-inner">{result}</div>
-              </Textfit>
+              <div className="result-text-container">
+                <div className="result-text-inner">
+                  <div 
+                    ref={resultRef}
+                    style={{ 
+                      transform: `scale(${textScale})`, 
+                      transformOrigin: 'center' 
+                    }}
+                  >
+                    {result}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
           <button 
             className="spin-button"
             onClick={handleSpinClick} 
-            disabled={mustSpin || rouletteData.length === 0}
+            disabled={rouletteData.length === 0}
             style={{ display: isObsMode ? 'none' : 'block' }}
           >
-            {mustSpin ? 'Girando...' : 'GIRAR!'}
+            GIRAR!
           </button>
         </div>
 

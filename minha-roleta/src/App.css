@@ -39,6 +39,7 @@ body {
 
 /* 🟢 O Texto em si com o Estilo Visual (Sombra, Cor, etc) */
 .result-text-inner {
+  font-size: 4.5rem;
   color: #ff4a3d; 
   font-weight: bold;
   text-transform: uppercase; 
