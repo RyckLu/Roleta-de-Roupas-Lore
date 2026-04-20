@@ -25,7 +25,7 @@ function App() {
     { option: 'Casual' }, { option: 'Sweater' }, { option: 'Bikini' },
     { option: 'Ghost' }, { option: 'Palhaxota' }, { option: 'Purplerina' },
     { option: 'Freira' }, { option: 'Natal' }, { option: 'Cavalheira' },
-    { option: 'Kitsune' }, //{ option: 'Bunny' }, //{ option: 'Schola' }
+    { option: 'Kitsune' }, { option: 'Mafiosa'} //{ option: 'Bunny' }, //{ option: 'Schola' }
   ]);
 
   const [newOption, setNewOption] = useState('');
