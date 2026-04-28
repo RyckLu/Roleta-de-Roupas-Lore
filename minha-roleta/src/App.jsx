@@ -11,7 +11,6 @@ function App() {
   const [prizeNumber, setPrizeNumber] = useState(0);
   const [result, setResult] = useState('');
   const [isVisible, setIsVisible] = useState(false); 
-
  
   const [spinQueue, setSpinQueue] = useState(0);
   // Memória para não contar o mesmo donate duas vezes
@@ -29,6 +28,29 @@ function App() {
   ]);
 
   const [newOption, setNewOption] = useState('');
+
+  // ------------------------------------------------------------------
+  //  COMUNICAÇÃO DIRETA COM O WARUDO 
+  // ------------------------------------------------------------------
+  const avisarWarudo = (nomeDaRoupa) => {
+    try {
+      // Bate na porta 19190 do seu computador (onde o Warudo vai estar ouvindo)
+      const ws = new WebSocket('ws://127.0.0.1:19190');
+      
+      ws.onopen = () => {
+        console.log(`Enviando para o Warudo: ${nomeDaRoupa}`);
+        ws.send(nomeDaRoupa); // Envia a String exata da roupa (ex: "Street")
+        ws.close(); // Desliga o rádio
+      };
+
+      ws.onerror = (error) => {
+        console.log("Warudo não está aberto ou a porta 19190 não foi configurada.", error);
+      };
+    } catch (err) {
+      console.log("Erro ao tentar falar com o Warudo", err);
+    }
+  };
+  // ------------------------------------------------------------------
 
   const triggerSpin = () => {
     setRouletteData((currentData) => {
@@ -48,11 +70,11 @@ function App() {
   useEffect(() => {
     // Se tem alguém na fila de espera E a roleta está livre (escondida)
     if (spinQueue > 0 && !isVisible) {
-      setSpinQueue(prevQueue => prevQueue - 1); // Tira 1 da fila
-      triggerSpin(); // Manda girar!
+      setSpinQueue(prevQueue => prevQueue - 1);
+      triggerSpin();
     }
   }, [spinQueue, isVisible]); 
-  
+
   const handleSpinClick = () => {
     if (rouletteData.length > 0) {
       // O botão manual agora também entra na fila educadamente!
@@ -60,8 +82,20 @@ function App() {
     }
   };
 
-  // Mágica de medir o texto nativo
- useEffect(() => {
+  useEffect(() => {
+    if (result && resultRef.current) {
+      const espacoSeguroDaRoleta = 420; 
+      const tamanhoRealDaPalavra = resultRef.current.scrollWidth;
+
+      if (tamanhoRealDaPalavra > espacoSeguroDaRoleta) {
+        setTextScale(espacoSeguroDaRoleta / tamanhoRealDaPalavra);
+      } else {
+        setTextScale(1); 
+      }
+    }
+  }, [result]); 
+
+  useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokensParam = urlParams.get('token');
     
@@ -80,7 +114,7 @@ function App() {
       });
 
       socket.on('event', (eventData) => {
-        // 🛡️ O FILTRO ANTI-CLONE AQUI!
+        //  O FILTRO ANTI-CLONE AQUI!
         // Pega a identidade única desse evento
         const idDoEvento = eventData._id; 
 
@@ -111,7 +145,7 @@ function App() {
     return () => {
       activeSockets.forEach(socket => socket.disconnect());
     };
-  }, []);
+  }, []); 
 
   const handleAddOption = (e) => {
     e.preventDefault();
@@ -145,8 +179,12 @@ function App() {
         >
           <h1 style={{ display: isObsMode ? 'none' : 'block' }}>Roleta de Roupas</h1>
           
-         
           <div className="wheel-container">
+            {spinQueue > 0 && (
+              <div className="queue-counter">
+                🔄 {spinQueue} na fila
+              </div>
+            )}
 
             <Wheel
               mustStartSpinning={mustSpin}
@@ -162,10 +200,14 @@ function App() {
               spinDuration={0.4}
               onStopSpinning={() => {
                 setMustSpin(false);
-                setResult(rouletteData[prizeNumber].option);
+                const roupaGanhadora = rouletteData[prizeNumber].option;
+                setResult(roupaGanhadora);
+
+                // 🚀 O MENSAGEIRO GRITA PARA O WARUDO AQUI!
+                avisarWarudo(roupaGanhadora);
 
                 setTimeout(() => {
-                  setIsVisible(false); // Quando some, o Guarda de Trânsito puxa o próximo!
+                  setIsVisible(false);
                 }, TEMPO_EXIBICAO);
               }}
             />
