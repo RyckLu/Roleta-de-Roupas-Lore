@@ -10,6 +10,7 @@ function App() {
   // ==========================================================================
   const TEMPO_EXIBICAO = 8000; // Tempo (em ms) que o resultado fica na tela após girar
   const VALOR_MINIMO_GIRO = 20; // Valor mínimo do donate para ativar um giro automático
+  const MINIMO_BITS_GIRO = 500; // 500 Bits (Exemplo. Ajuste para o valor que preferir)
 
   // ==========================================================================
   // 🧠 ESTADOS DA APLICAÇÃO (MEMÓRIA DO COMPONENTE)
@@ -126,9 +127,8 @@ function App() {
       }
     }
   }, [result]); 
-
-  // ==========================================================================
-  // 💰 STREAMLABS: INTEGRAÇÃO COM DONATES (E LIVEPIX)
+// ==========================================================================
+  // 💰 STREAMLABS: INTEGRAÇÃO COM DONATES, SUPERCHATS E BITS
   // ==========================================================================
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -140,18 +140,17 @@ function App() {
     const activeSockets = []; 
 
     tokensList.forEach((tokenDaUrl) => {
-      // Conecta no Streamlabs com o token
       const socket = io(`https://sockets.streamlabs.com?token=${tokenDaUrl}`, {
         transports: ['websocket']
       });
 
-      // Escuta os alertas do Streamlabs
       socket.on('event', (eventData) => {
-        if (eventData.type === 'donation') {
+        // Escuta Doações (PIX/Cartão), Super Chats E Bits da Twitch!
+        if (eventData.type === 'donation' || eventData.type === 'superchat' || eventData.type === 'bits') {
           
-          // O Streamlabs pode mandar múltiplos donates de uma vez
           eventData.message.forEach((donate) => {
             const idDoEvento = donate._id || donate.id; 
+            const tipoEvento = eventData.type; 
 
             // Filtro Anti-Clone
             if (idDoEvento && eventosProcessados.current.has(idDoEvento)) {
@@ -161,14 +160,30 @@ function App() {
               eventosProcessados.current.add(idDoEvento);
             }
 
-            // 🕵️ OS ESPIÕES DE TESTE DE VALOR:
-            console.log(` O Streamlabs avisou que chegou um donate de: R$ ${donate.amount}`);
+            // 🛑 CORREÇÃO: Pega o valor independente de como o Streamlabs mandar
+            const valorBruto = donate.amount || donate.parsed_amount || 0;
+            const amount = Number(valorBruto); // Aqui garantimos que a variável amount sempre exista
 
-            if (Number(donate.amount) >= VALOR_MINIMO_GIRO) {
-              console.log(" Valor APROVADO! Colocando giro na fila.");
+            console.log(` Streamlabs avisou: ${amount} (Tipo: ${tipoEvento})`);
+
+            let aprovado = false;
+
+            // REGRA 1: Se for BITS, usa a meta de bits
+            // (Certifique-se de ter criado a variável MINIMO_BITS_GIRO lá no topo do arquivo!)
+            if (tipoEvento === 'bits' && amount >= MINIMO_BITS_GIRO) {
+              aprovado = true;
+            } 
+            // REGRA 2: Se for DINHEIRO, usa a meta de dinheiro
+            else if ((tipoEvento === 'donation' || tipoEvento === 'superchat') && amount >= VALOR_MINIMO_GIRO) {
+              aprovado = true;
+            }
+
+            // O Veredito
+            if (aprovado) {
+              console.log(" APROVADO! Colocando giro na fila.");
               setSpinQueue(prevQueue => prevQueue + 1);
             } else {
-              console.log(" Valor RECUSADO! Abaixo do mínimo. A roleta não vai girar.");
+              console.log(" RECUSADO! Valor abaixo da meta configurada.");
             }
           });
         }
@@ -180,7 +195,7 @@ function App() {
     return () => {
       activeSockets.forEach(socket => socket.disconnect());
     };
-  }, []); 
+  }, []);
 
   // ==========================================================================
   // 💾 SUPABASE: INSERIR E DELETAR DADOS
@@ -222,9 +237,9 @@ function App() {
           <h1 style={{ display: isObsMode ? 'none' : 'block' }}>Roleta de Roupas</h1>
           
           <div className="wheel-container">
-            {spinQueue > 0 && (
+            {spinQueue > 0 && !isObsMode && (
               <div className="queue-counter">
-                 {spinQueue} na fila
+                🔄 {spinQueue} na fila
               </div>
             )}
 
