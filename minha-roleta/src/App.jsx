@@ -1,63 +1,94 @@
 import { useState, useEffect, useRef } from 'react';
 import { Wheel } from 'react-custom-roulette';
 import io from 'socket.io-client';
+import { supabase } from './supabase';
 import './App.css';
 
 function App() {
-  const TEMPO_EXIBICAO = 8000; 
-  const VALOR_MINIMO_GIRO = 20; 
+  // ==========================================================================
+  // ⚙️ CONFIGURAÇÕES GLOBAIS DA ROLETA
+  // ==========================================================================
+  const TEMPO_EXIBICAO = 8000; // Tempo (em ms) que o resultado fica na tela após girar
+  const VALOR_MINIMO_GIRO = 20; // Valor mínimo do donate para ativar um giro automático
 
-  const [mustSpin, setMustSpin] = useState(false);
-  const [prizeNumber, setPrizeNumber] = useState(0);
-  const [result, setResult] = useState('');
+  // ==========================================================================
+  // 🧠 ESTADOS DA APLICAÇÃO (MEMÓRIA DO COMPONENTE)
+  // ==========================================================================
+  // Estados de controle da animação da roleta
+  const [mustSpin, setMustSpin] = useState(false); 
+  const [prizeNumber, setPrizeNumber] = useState(0); 
+  const [result, setResult] = useState(''); 
   const [isVisible, setIsVisible] = useState(false); 
- 
-  const [spinQueue, setSpinQueue] = useState(0);
-  // Memória para não contar o mesmo donate duas vezes
-  const eventosProcessados = useRef(new Set());
 
-  const resultRef = useRef(null);
-  const [textScale, setTextScale] = useState(1);
+  // Estados de controle de fila (para quando caem vários donates juntos)
+  const [spinQueue, setSpinQueue] = useState(0); 
+  const eventosProcessados = useRef(new Set()); 
 
-  const [rouletteData, setRouletteData] = useState([
-    { option: 'Prime' }, { option: 'Brazil' }, { option: 'Street' },
-    { option: 'Casual' }, { option: 'Sweater' }, { option: 'Bikini' },
-    { option: 'Ghost' }, { option: 'Palhaxota' }, { option: 'Purplerina' },
-    { option: 'Freira' }, { option: 'Natal' }, { option: 'Cavalheira' },
-    { option: 'Kitsune' }, { option: 'Mafiosa'} //{ option: 'Bunny' }, //{ option: 'Schola' }
-  ]);
+  // Estados de controle visual do texto do resultado
+  const resultRef = useRef(null); 
+  const [textScale, setTextScale] = useState(1); 
 
-  const [newOption, setNewOption] = useState('');
+  // Estados dos dados do banco de dados (Supabase)
+  const [rouletteData, setRouletteData] = useState([]); 
+  const [newOption, setNewOption] = useState(''); 
 
-  // ------------------------------------------------------------------
-  //  COMUNICAÇÃO DIRETA COM O WARUDO 
-  // ------------------------------------------------------------------
+  // ==========================================================================
+  // ☁️ SUPABASE: CONEXÃO E TEMPO REAL
+  // ==========================================================================
+  useEffect(() => {
+    // Busca todas as roupas cadastradas na tabela 'roupas'
+    const fetchRoupas = async () => {
+      const { data, error } = await supabase.from('roupas').select('*');
+      if (error) {
+        console.error("Erro ao buscar roupas:", error);
+      } else if (data) {
+        setRouletteData(data);
+      }
+    };
+
+    fetchRoupas(); 
+
+    // "Liga o rádio": Escuta mudanças no banco 24h por dia. 
+    const subscription = supabase
+      .channel('roupas-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roupas' }, () => {
+        fetchRoupas(); 
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(subscription);
+  }, []);
+
+  // ==========================================================================
+  // 🔌 WARUDO: COMUNICAÇÃO LOCAL (TROCA DE ROUPA)
+  // ==========================================================================
   const avisarWarudo = (nomeDaRoupa) => {
     try {
-      // Bate na porta 19190 do seu computador (onde o Warudo vai estar ouvindo)
-      const ws = new WebSocket('ws://127.0.0.1:19190');
+      const ws = new WebSocket('ws://127.0.0.1:19190'); 
       
       ws.onopen = () => {
         console.log(`Enviando para o Warudo: ${nomeDaRoupa}`);
-        ws.send(nomeDaRoupa); // Envia a String exata da roupa (ex: "Street")
-        ws.close(); // Desliga o rádio
+        ws.send(nomeDaRoupa); 
+        ws.close(); 
       };
-
+      
       ws.onerror = (error) => {
-        console.log("Warudo não está aberto ou a porta 19190 não foi configurada.", error);
+        console.log("Warudo não está aberto ou a porta não foi configurada.", error);
       };
     } catch (err) {
       console.log("Erro ao tentar falar com o Warudo", err);
     }
   };
-  // ------------------------------------------------------------------
 
+  // ==========================================================================
+  // 🎲 LÓGICA DE GIRO DA ROLETA
+  // ==========================================================================
   const triggerSpin = () => {
     setRouletteData((currentData) => {
       if (currentData.length > 0) {
         const newPrizeNumber = Math.floor(Math.random() * currentData.length);
-        setPrizeNumber(newPrizeNumber);
-        setMustSpin(true);
+        setPrizeNumber(newPrizeNumber); 
+        setMustSpin(true); 
         setResult(''); 
         setIsVisible(true); 
       }
@@ -65,23 +96,24 @@ function App() {
     });
   };
 
-  
-  // Gerenciador da Fila
+  // Gerenciador de Fila: Se tiver giros pendentes e a roleta não estiver ocupada, gira.
   useEffect(() => {
-    // Se tem alguém na fila de espera E a roleta está livre (escondida)
     if (spinQueue > 0 && !isVisible) {
-      setSpinQueue(prevQueue => prevQueue - 1);
-      triggerSpin();
+      setSpinQueue(prevQueue => prevQueue - 1); 
+      triggerSpin(); 
     }
   }, [spinQueue, isVisible]); 
 
+  // Botão manual do painel 
   const handleSpinClick = () => {
     if (rouletteData.length > 0) {
-      // O botão manual agora também entra na fila educadamente!
       setSpinQueue(prevQueue => prevQueue + 1);
     }
   };
 
+  // ==========================================================================
+  // 📏 AJUSTE AUTOMÁTICO DO TAMANHO DA PALAVRA
+  // ==========================================================================
   useEffect(() => {
     if (result && resultRef.current) {
       const espacoSeguroDaRoleta = 420; 
@@ -95,6 +127,9 @@ function App() {
     }
   }, [result]); 
 
+  // ==========================================================================
+  // 💰 STREAMLABS: INTEGRAÇÃO COM DONATES (E LIVEPIX)
+  // ==========================================================================
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokensParam = urlParams.get('token');
@@ -105,37 +140,37 @@ function App() {
     const activeSockets = []; 
 
     tokensList.forEach((tokenDaUrl) => {
-      const socket = io('https://realtime.streamelements.com', {
+      // Conecta no Streamlabs com o token
+      const socket = io(`https://sockets.streamlabs.com?token=${tokenDaUrl}`, {
         transports: ['websocket']
       });
 
-      socket.on('connect', () => {
-        socket.emit('authenticate', { method: 'jwt', token: tokenDaUrl });
-      });
-
+      // Escuta os alertas do Streamlabs
       socket.on('event', (eventData) => {
-        //  O FILTRO ANTI-CLONE AQUI!
-        // Pega a identidade única desse evento
-        const idDoEvento = eventData._id; 
+        if (eventData.type === 'donation') {
+          
+          // O Streamlabs pode mandar múltiplos donates de uma vez
+          eventData.message.forEach((donate) => {
+            const idDoEvento = donate._id || donate.id; 
 
-        // Se esse donate já passou por aqui, ignora e cancela!
-        if (idDoEvento && eventosProcessados.current.has(idDoEvento)) {
-          return; 
-        }
+            // Filtro Anti-Clone
+            if (idDoEvento && eventosProcessados.current.has(idDoEvento)) {
+              return; 
+            }
+            if (idDoEvento) {
+              eventosProcessados.current.add(idDoEvento);
+            }
 
-        // Anota na prancheta que já recebemos esse ID
-        if (idDoEvento) {
-          eventosProcessados.current.add(idDoEvento);
-        }
+            // 🕵️ OS ESPIÕES DE TESTE DE VALOR:
+            console.log(` O Streamlabs avisou que chegou um donate de: R$ ${donate.amount}`);
 
-        if (eventData.type === 'tip') {
-          const amount = eventData.amount 
-                      || (eventData.data && eventData.data.amount) 
-                      || (eventData.detail && eventData.detail.amount);
-
-          if (Number(amount) >= VALOR_MINIMO_GIRO) {
-            setSpinQueue(prevQueue => prevQueue + 1);
-          }
+            if (Number(donate.amount) >= VALOR_MINIMO_GIRO) {
+              console.log(" Valor APROVADO! Colocando giro na fila.");
+              setSpinQueue(prevQueue => prevQueue + 1);
+            } else {
+              console.log(" Valor RECUSADO! Abaixo do mínimo. A roleta não vai girar.");
+            }
+          });
         }
       });
 
@@ -147,25 +182,32 @@ function App() {
     };
   }, []); 
 
-  const handleAddOption = (e) => {
+  // ==========================================================================
+  // 💾 SUPABASE: INSERIR E DELETAR DADOS
+  // ==========================================================================
+  const handleAddOption = async (e) => {
     e.preventDefault();
     if (newOption.trim() !== '') {
-      setRouletteData([...rouletteData, { option: newOption }]);
-      setNewOption('');
+      await supabase.from('roupas').insert([{ option: newOption }]);
+      setNewOption(''); 
     }
   };
 
-  const handleRemoveOption = (indexToRemove) => {
+  const handleRemoveOption = async (idToRemove) => {
     if (rouletteData.length <= 1) return;
-    const newData = rouletteData.filter((_, index) => index !== indexToRemove);
-    setRouletteData(newData);
+    await supabase.from('roupas').delete().eq('id', idToRemove);
   };
 
   const isObsMode = new URLSearchParams(window.location.search).get('obs') === 'true';
 
+  // ==========================================================================
+  // 🎨 RENDERIZAÇÃO DA INTERFACE (HTML/JSX)
+  // ==========================================================================
   return (
     <div className="app-wrapper">
       <div className="container">
+        
+        {/* CAIXA DA ROLETA */}
         <div 
           className="card roulette-section" 
           style={{ 
@@ -182,35 +224,42 @@ function App() {
           <div className="wheel-container">
             {spinQueue > 0 && (
               <div className="queue-counter">
-                🔄 {spinQueue} na fila
+                 {spinQueue} na fila
               </div>
             )}
 
-            <Wheel
-              mustStartSpinning={mustSpin}
-              prizeNumber={prizeNumber}
-              data={rouletteData}
-              backgroundColors={['#883030', '#46ad32', '#2db1b6', '#3453a7', '#803aaf', '#b333b3', '#a52f66']}
-              textColors={['#ffffff']}
-              outerBorderColor="#1e1e1e"
-              outerBorderWidth={0}
-              innerBorderColor="#1e1e1e"
-              radiusLineColor="#1e1e1e"
-              radiusLineWidth={2}
-              spinDuration={0.4}
-              onStopSpinning={() => {
-                setMustSpin(false);
-                const roupaGanhadora = rouletteData[prizeNumber].option;
-                setResult(roupaGanhadora);
+            {rouletteData.length > 0 ? (
+              <Wheel
+                mustStartSpinning={mustSpin}
+                prizeNumber={prizeNumber}
+                data={rouletteData}
+                backgroundColors={['#883030', '#46ad32', '#2db1b6', '#3453a7', '#803aaf', '#b333b3', '#a52f66']}
+                textColors={['#ffffff']}
+                outerBorderColor="#1e1e1e"
+                outerBorderWidth={0}
+                innerBorderColor="#1e1e1e"
+                radiusLineColor="#1e1e1e"
+                radiusLineWidth={2}
+                spinDuration={0.4}
+                onStopSpinning={() => {
+                  setMustSpin(false);
+                  const roupaGanhadora = rouletteData[prizeNumber].option;
+                  setResult(roupaGanhadora);
 
-                // 🚀 O MENSAGEIRO GRITA PARA O WARUDO AQUI!
-                avisarWarudo(roupaGanhadora);
+                  if (isObsMode) {
+                    avisarWarudo(roupaGanhadora);
+                  }
 
-                setTimeout(() => {
-                  setIsVisible(false);
-                }, TEMPO_EXIBICAO);
-              }}
-            />
+                  setTimeout(() => {
+                    setIsVisible(false);
+                  }, TEMPO_EXIBICAO);
+                }}
+              />
+            ) : (
+              <div style={{ color: '#fff', textAlign: 'center' }}>
+                Carregando roupas... Adicione uma abaixo!
+              </div>
+            )}
             
             {result && (
               <div className="result-text-container">
@@ -239,9 +288,11 @@ function App() {
           </button>
         </div>
 
+        {/* PAINEL DE CONTROLE (Oculto na tela do OBS) */}
         {!isObsMode && (
           <div className="card controls-section">
             <h2>Personalizar Opções</h2>
+            
             <form onSubmit={handleAddOption} className="add-form">
               <input
                 type="text"
@@ -253,13 +304,13 @@ function App() {
             </form>
 
             <ul className="options-list">
-              {rouletteData.map((item, index) => (
-                <li key={index} className="option-item">
+              {rouletteData.map((item) => (
+                <li key={item.id} className="option-item">
                   <span className="option-text">{item.option}</span>
                   <button 
                     className="remove-button"
-                    onClick={() => handleRemoveOption(index)}
-                    disabled={mustSpin}
+                    onClick={() => handleRemoveOption(item.id)}
+                    disabled={mustSpin} 
                   >
                     ✕
                   </button>
@@ -268,6 +319,7 @@ function App() {
             </ul>
           </div>
         )}
+        
       </div>
     </div>
   );
